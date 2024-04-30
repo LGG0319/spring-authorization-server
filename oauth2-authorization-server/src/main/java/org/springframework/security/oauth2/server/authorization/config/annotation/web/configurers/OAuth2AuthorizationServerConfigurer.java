@@ -81,11 +81,14 @@ import static org.springframework.security.oauth2.server.authorization.config.an
  * @see OAuth2AuthorizationService
  * @see OAuth2AuthorizationConsentService
  * @see NimbusJwkSetEndpointFilter
+ * OAuth2 授权服务器配置器
  */
 public final class OAuth2AuthorizationServerConfigurer
 		extends AbstractHttpConfigurer<OAuth2AuthorizationServerConfigurer, HttpSecurity> {
 
+	// 所有授权服务器端点配置器
 	private final Map<Class<? extends AbstractOAuth2Configurer>, AbstractOAuth2Configurer> configurers = createConfigurers();
+	// 匹配所有授权服务器端点对应的请求，以及JwkSet端点请求
 	private RequestMatcher endpointsMatcher;
 
 
@@ -248,6 +251,7 @@ public final class OAuth2AuthorizationServerConfigurer
 	 *
 	 * @param oidcCustomizer the {@link Customizer} providing access to the {@link OidcConfigurer}
 	 * @return the {@link OAuth2AuthorizationServerConfigurer} for further configuration
+	 * 启用OpenID Connect 1.0支持（默认关闭）
 	 */
 	public OAuth2AuthorizationServerConfigurer oidc(Customizer<OidcConfigurer> oidcCustomizer) {
 		OidcConfigurer oidcConfigurer = getConfigurer(OidcConfigurer.class);
@@ -270,18 +274,25 @@ public final class OAuth2AuthorizationServerConfigurer
 		return (request) -> this.endpointsMatcher.matches(request);
 	}
 
+	// 配置器初始化
 	@Override
 	public void init(HttpSecurity httpSecurity) {
+		// 获取授权服务器设置(各端点url)
 		AuthorizationServerSettings authorizationServerSettings = OAuth2ConfigurerUtils.getAuthorizationServerSettings(httpSecurity);
+		// 校验issuerUri
 		validateAuthorizationServerSettings(authorizationServerSettings);
-
+		// 处理OpenID Connect认证请求
 		if (isOidcEnabled()) {
 			// Add OpenID Connect session tracking capabilities.
+			// 如果启用OpenID Connect 1.0
+			// 添加 OpenID Connect 会话跟踪能力
 			initSessionRegistry(httpSecurity);
 			SessionRegistry sessionRegistry = httpSecurity.getSharedObject(SessionRegistry.class);
+			// 授权端点设置会话认证策略
 			OAuth2AuthorizationEndpointConfigurer authorizationEndpointConfigurer =
 					getConfigurer(OAuth2AuthorizationEndpointConfigurer.class);
 			authorizationEndpointConfigurer.setSessionAuthenticationStrategy((authentication, request, response) -> {
+				// 如果认证请求是使用授权码模式的OAuth2认证请求，且scope包含openid，则将会话注册到会话注册表
 				if (authentication instanceof OAuth2AuthorizationCodeRequestAuthenticationToken authorizationCodeRequestAuthentication) {
 					if (authorizationCodeRequestAuthentication.getScopes().contains(OidcScopes.OPENID)) {
 						if (sessionRegistry.getSessionInformation(request.getSession().getId()) == null) {
@@ -292,6 +303,8 @@ public final class OAuth2AuthorizationServerConfigurer
 					}
 				}
 			});
+			// 如果OpenID Connect 没有启用.
+			// 添加认证校验器，拒绝scope包含openid的认证请求
 		} else {
 			// OpenID Connect is disabled.
 			// Add an authentication validator that rejects authentication requests.
@@ -309,16 +322,18 @@ public final class OAuth2AuthorizationServerConfigurer
 				}
 			});
 		}
-
+		// 构造授权端点请求匹配器
 		List<RequestMatcher> requestMatchers = new ArrayList<>();
+		// 添加每个端点对应的匹配规则
 		this.configurers.values().forEach(configurer -> {
 			configurer.init(httpSecurity);
 			requestMatchers.add(configurer.getRequestMatcher());
 		});
+		// 添加JwkSet端点请求匹配规则
 		requestMatchers.add(new AntPathRequestMatcher(
 				withMultipleIssuerPattern(authorizationServerSettings.getJwkSetEndpoint()), HttpMethod.GET.name()));
 		this.endpointsMatcher = new OrRequestMatcher(requestMatchers);
-
+		// 当令牌获取/内省/撤回/设备认证端点发生访问拒绝异常或者认证异常时返回401未授权响应
 		ExceptionHandlingConfigurer<HttpSecurity> exceptionHandling = httpSecurity.getConfigurer(ExceptionHandlingConfigurer.class);
 		if (exceptionHandling != null) {
 			exceptionHandling.defaultAuthenticationEntryPointFor(
@@ -332,15 +347,17 @@ public final class OAuth2AuthorizationServerConfigurer
 		}
 	}
 
+	// 执行安全配置
 	@Override
 	public void configure(HttpSecurity httpSecurity) {
+		// 应用各端点配置器
 		this.configurers.values().forEach(configurer -> configurer.configure(httpSecurity));
 
 		AuthorizationServerSettings authorizationServerSettings = OAuth2ConfigurerUtils.getAuthorizationServerSettings(httpSecurity);
-
+		// 获取授权服务器设置
 		AuthorizationServerContextFilter authorizationServerContextFilter = new AuthorizationServerContextFilter(authorizationServerSettings);
 		httpSecurity.addFilterAfter(postProcess(authorizationServerContextFilter), SecurityContextHolderFilter.class);
-
+		// 添加JwkSet端点过滤器
 		JWKSource<com.nimbusds.jose.proc.SecurityContext> jwkSource = OAuth2ConfigurerUtils.getJwkSource(httpSecurity);
 		if (jwkSource != null) {
 			NimbusJwkSetEndpointFilter jwkSetEndpointFilter = new NimbusJwkSetEndpointFilter(
@@ -352,16 +369,24 @@ public final class OAuth2AuthorizationServerConfigurer
 	private boolean isOidcEnabled() {
 		return getConfigurer(OidcConfigurer.class) != null;
 	}
-
+	// 创建OAuth2服务器端点配置器
 	private Map<Class<? extends AbstractOAuth2Configurer>, AbstractOAuth2Configurer> createConfigurers() {
 		Map<Class<? extends AbstractOAuth2Configurer>, AbstractOAuth2Configurer> configurers = new LinkedHashMap<>();
+		// 客户端认证
 		configurers.put(OAuth2ClientAuthenticationConfigurer.class, new OAuth2ClientAuthenticationConfigurer(this::postProcess));
+		// 授权服务器元数据端点
 		configurers.put(OAuth2AuthorizationServerMetadataEndpointConfigurer.class, new OAuth2AuthorizationServerMetadataEndpointConfigurer(this::postProcess));
+		// 授权端点
 		configurers.put(OAuth2AuthorizationEndpointConfigurer.class, new OAuth2AuthorizationEndpointConfigurer(this::postProcess));
+		// 令牌获取端点
 		configurers.put(OAuth2TokenEndpointConfigurer.class, new OAuth2TokenEndpointConfigurer(this::postProcess));
+		// 令牌内省端点
 		configurers.put(OAuth2TokenIntrospectionEndpointConfigurer.class, new OAuth2TokenIntrospectionEndpointConfigurer(this::postProcess));
+		// 令牌撤回端点
 		configurers.put(OAuth2TokenRevocationEndpointConfigurer.class, new OAuth2TokenRevocationEndpointConfigurer(this::postProcess));
+		// 设备授权端点
 		configurers.put(OAuth2DeviceAuthorizationEndpointConfigurer.class, new OAuth2DeviceAuthorizationEndpointConfigurer(this::postProcess));
+		// 设备校验端点
 		configurers.put(OAuth2DeviceVerificationEndpointConfigurer.class, new OAuth2DeviceVerificationEndpointConfigurer(this::postProcess));
 		return configurers;
 	}
