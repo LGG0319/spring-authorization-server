@@ -75,6 +75,7 @@ import org.springframework.util.StringUtils;
  * @see RegisteredClient
  * @see JdbcOperations
  * @see RowMapper
+ * 基于数据库持久化 Client 信息
  */
 @ImportRuntimeHints(JdbcRegisteredClientRepository.JdbcRegisteredClientRepositoryRuntimeHintsRegistrar.class)
 public class JdbcRegisteredClientRepository implements RegisteredClientRepository {

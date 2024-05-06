@@ -153,19 +153,23 @@ public final class OAuth2AuthorizationEndpointFilter extends OncePerRequestFilte
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
 			throws ServletException, IOException {
 
+		// 匹配 /oauth2/authorize 路径
 		if (!this.authorizationEndpointMatcher.matches(request)) {
 			filterChain.doFilter(request, response);
 			return;
 		}
 
 		try {
+			// 将 request 处理为 Authentication
 			Authentication authentication = this.authenticationConverter.convert(request);
 			if (authentication instanceof AbstractAuthenticationToken) {
 				((AbstractAuthenticationToken) authentication)
 						.setDetails(this.authenticationDetailsSource.buildDetails(request));
 			}
+			// 由对应的 AuthorizationProvider 处理
+			// 比如生成授权码、处理 Consent 信息等
 			Authentication authenticationResult = this.authenticationManager.authenticate(authentication);
-
+			// 如果用户还未认证，则继续执行下去，可能会被登录页面等拦截器处理
 			if (!authenticationResult.isAuthenticated()) {
 				// If the Principal (Resource Owner) is not authenticated then
 				// pass through the chain with the expectation that the authentication process
@@ -173,7 +177,7 @@ public final class OAuth2AuthorizationEndpointFilter extends OncePerRequestFilte
 				filterChain.doFilter(request, response);
 				return;
 			}
-
+			// 如果需要审核则发送 Consent 页面
 			if (authenticationResult instanceof OAuth2AuthorizationConsentAuthenticationToken) {
 				if (this.logger.isTraceEnabled()) {
 					this.logger.trace("Authorization consent is required");
@@ -186,7 +190,7 @@ public final class OAuth2AuthorizationEndpointFilter extends OncePerRequestFilte
 
 			this.sessionAuthenticationStrategy.onAuthentication(
 					authenticationResult, request, response);
-
+			// 如果不需要则直接重定向客户端回调地址
 			this.authenticationSuccessHandler.onAuthenticationSuccess(
 					request, response, authenticationResult);
 

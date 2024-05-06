@@ -25,6 +25,7 @@ import org.springframework.lang.Nullable;
  * @since 0.0.1
  * @see OAuth2Authorization
  * @see OAuth2TokenType
+ * 代表客户端在认证中心的授权信息
  */
 public interface OAuth2AuthorizationService {
 

@@ -36,6 +36,7 @@ import org.springframework.util.StringUtils;
  * @see RegisteredClientRepository
  * @see RegisteredClient
  * @since 0.0.1
+ * 基于内存保存 Client 信息
  */
 public final class InMemoryRegisteredClientRepository implements RegisteredClientRepository {
 	private final Map<String, RegisteredClient> idRegistrationMap;

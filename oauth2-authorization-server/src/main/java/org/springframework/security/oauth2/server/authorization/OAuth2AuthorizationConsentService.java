@@ -27,6 +27,7 @@ import java.security.Principal;
  * @author Daniel Garnier-Moiroux
  * @since 0.1.2
  * @see OAuth2AuthorizationConsent
+ * 代表客户端授权的审核信息
  */
 public interface OAuth2AuthorizationConsentService {
 

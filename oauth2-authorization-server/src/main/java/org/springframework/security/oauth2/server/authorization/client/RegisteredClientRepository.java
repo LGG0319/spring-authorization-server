@@ -25,6 +25,7 @@ import org.springframework.lang.Nullable;
  * @author Ovidiu Popa
  * @see RegisteredClient
  * @since 0.0.1
+ * 该组件主要负责注册的 Client 信息
  */
 public interface RegisteredClientRepository {
 
