@@ -75,9 +75,16 @@ public final class OAuth2AuthorizationCodeRequestAuthenticationProvider implemen
 	private static final StringKeyGenerator DEFAULT_STATE_GENERATOR =
 			new Base64StringKeyGenerator(Base64.getUrlEncoder());
 	private final Log logger = LogFactory.getLog(getClass());
+	// 注册的client的repo
 	private final RegisteredClientRepository registeredClientRepository;
+	// OAuth2的Authentication的信息，默认InMemory实现
+	// 包含两个部分，一个已经完成，一个流程中
+	//	Map<String, OAuth2Authorization> initializedAuthorizations = ...
+	//	Map<String, OAuth2Authorization> authorizations = ...
 	private final OAuth2AuthorizationService authorizationService;
+	// OAuth2已经授权过的信息
 	private final OAuth2AuthorizationConsentService authorizationConsentService;
+	// code生成器
 	private OAuth2TokenGenerator<OAuth2AuthorizationCode> authorizationCodeGenerator = new OAuth2AuthorizationCodeGenerator();
 	private Consumer<OAuth2AuthorizationCodeRequestAuthenticationContext> authenticationValidator =
 			new OAuth2AuthorizationCodeRequestAuthenticationValidator();
@@ -105,9 +112,10 @@ public final class OAuth2AuthorizationCodeRequestAuthenticationProvider implemen
 	public Authentication authenticate(Authentication authentication) throws AuthenticationException {
 		OAuth2AuthorizationCodeRequestAuthenticationToken authorizationCodeRequestAuthentication =
 				(OAuth2AuthorizationCodeRequestAuthenticationToken) authentication;
-
+		// 找client
 		RegisteredClient registeredClient = this.registeredClientRepository.findByClientId(
 				authorizationCodeRequestAuthentication.getClientId());
+		// 没有就抛异常
 		if (registeredClient == null) {
 			throwError(OAuth2ErrorCodes.INVALID_REQUEST, OAuth2ParameterNames.CLIENT_ID,
 					authorizationCodeRequestAuthentication, null);
@@ -116,12 +124,12 @@ public final class OAuth2AuthorizationCodeRequestAuthenticationProvider implemen
 		if (this.logger.isTraceEnabled()) {
 			this.logger.trace("Retrieved registered client");
 		}
-
+		// 有client进一步校验参数
 		OAuth2AuthorizationCodeRequestAuthenticationContext.Builder authenticationContextBuilder =
 				OAuth2AuthorizationCodeRequestAuthenticationContext.with(authorizationCodeRequestAuthentication)
 						.registeredClient(registeredClient);
 		this.authenticationValidator.accept(authenticationContextBuilder.build());
-
+		// 注册的用户没有code grant的类型，抛异常
 		if (!registeredClient.getAuthorizationGrantTypes().contains(AuthorizationGrantType.AUTHORIZATION_CODE)) {
 			if (this.logger.isDebugEnabled()) {
 				this.logger.debug(LogMessage.format("Invalid request: requested grant_type is not allowed" +
@@ -133,12 +141,14 @@ public final class OAuth2AuthorizationCodeRequestAuthenticationProvider implemen
 
 		// code_challenge (REQUIRED for public clients) - RFC 7636 (PKCE)
 		String codeChallenge = (String) authorizationCodeRequestAuthentication.getAdditionalParameters().get(PkceParameterNames.CODE_CHALLENGE);
+		// 有 code_challenge 和 code_challenge_method参数，进一步校验
 		if (StringUtils.hasText(codeChallenge)) {
 			String codeChallengeMethod = (String) authorizationCodeRequestAuthentication.getAdditionalParameters().get(PkceParameterNames.CODE_CHALLENGE_METHOD);
 			if (!StringUtils.hasText(codeChallengeMethod) || !"S256".equals(codeChallengeMethod)) {
 				throwError(OAuth2ErrorCodes.INVALID_REQUEST, PkceParameterNames.CODE_CHALLENGE_METHOD, PKCE_ERROR_URI,
 						authorizationCodeRequestAuthentication, registeredClient, null);
 			}
+		// 没有看server端是否必需PKCE，如果必需抛异常
 		} else if (registeredClient.getClientSettings().isRequireProofKey()) {
 			throwError(OAuth2ErrorCodes.INVALID_REQUEST, PkceParameterNames.CODE_CHALLENGE, PKCE_ERROR_URI,
 					authorizationCodeRequestAuthentication, registeredClient, null);
@@ -151,8 +161,9 @@ public final class OAuth2AuthorizationCodeRequestAuthenticationProvider implemen
 		// ---------------
 		// The request is valid - ensure the resource owner is authenticated
 		// ---------------
-
+		// 获得当前的 Authentication,此时类型是OAuth2AuthorizationCodeRequestAuthenticationToken
 		Authentication principal = (Authentication) authorizationCodeRequestAuthentication.getPrincipal();
+		// 没有认证过，直接返回，第一次请求开始就在这里返回
 		if (!isPrincipalAuthenticated(principal)) {
 			if (this.logger.isTraceEnabled()) {
 				this.logger.trace("Did not authenticate authorization code request since principal not authenticated");
@@ -160,7 +171,9 @@ public final class OAuth2AuthorizationCodeRequestAuthenticationProvider implemen
 			// Return the authorization request as-is where isAuthenticated() is false
 			return authorizationCodeRequestAuthentication;
 		}
-
+		// 进行到这里，表示用户已经通过另一条SecurityFilterChain登录过，并返回了登录信息
+		// 登录后下面即将开始授权流程
+		// 生成一个Request包含前面所有信息
 		OAuth2AuthorizationRequest authorizationRequest = OAuth2AuthorizationRequest.authorizationCode()
 				.authorizationUri(authorizationCodeRequestAuthentication.getAuthorizationUri())
 				.clientId(registeredClient.getClientId())
@@ -170,14 +183,17 @@ public final class OAuth2AuthorizationCodeRequestAuthenticationProvider implemen
 				.additionalParameters(authorizationCodeRequestAuthentication.getAdditionalParameters())
 				.build();
 		authenticationContextBuilder.authorizationRequest(authorizationRequest);
-
+		// 根据client_id和name查询是否已经授权过，没有授权这里为null
 		OAuth2AuthorizationConsent currentAuthorizationConsent = this.authorizationConsentService.findById(
 				registeredClient.getId(), principal.getName());
+		// requireAuthorizationConsent 方法
+		// 如果consent为null，获取配置不需要consent就跳过
 		if (currentAuthorizationConsent != null) {
 			authenticationContextBuilder.authorizationConsent(currentAuthorizationConsent);
 		}
 
 		if (this.authorizationConsentRequired.test(authenticationContextBuilder.build())) {
+			// 需要授权,生成state
 			String state = DEFAULT_STATE_GENERATOR.generateKey();
 			OAuth2Authorization authorization = authorizationBuilder(registeredClient, principal, authorizationRequest)
 					.attribute(OAuth2ParameterNames.STATE, state)
@@ -186,7 +202,7 @@ public final class OAuth2AuthorizationCodeRequestAuthenticationProvider implemen
 			if (this.logger.isTraceEnabled()) {
 				logger.trace("Generated authorization consent state");
 			}
-
+			// 保存流程中的Authorization
 			this.authorizationService.save(authorization);
 
 			Set<String> currentAuthorizedScopes = currentAuthorizationConsent != null ?
@@ -195,7 +211,9 @@ public final class OAuth2AuthorizationCodeRequestAuthenticationProvider implemen
 			if (this.logger.isTraceEnabled()) {
 				this.logger.trace("Saved authorization");
 			}
-
+			// 返回OAuth2AuthorizationConsentAuthenticationToken类型
+			// 在OAuth2AuthenticationEndpointFilter中会判断返回结果Authentication是否是下面的类型
+			// 如果是表示需要进行授权操作，授权重定向流程在OAuth2AuthenticationEndpointFilter#sendAuthorizationConsent中
 			return new OAuth2AuthorizationConsentAuthenticationToken(authorizationRequest.getAuthorizationUri(),
 					registeredClient.getClientId(), principal, state, currentAuthorizedScopes, null);
 		}
@@ -217,6 +235,8 @@ public final class OAuth2AuthorizationCodeRequestAuthenticationProvider implemen
 				.authorizedScopes(authorizationRequest.getScopes())
 				.token(authorizationCode)
 				.build();
+		// 此时已经授权过了
+		// 保存已完成的Authentication
 		this.authorizationService.save(authorization);
 
 		if (this.logger.isTraceEnabled()) {
@@ -231,7 +251,7 @@ public final class OAuth2AuthorizationCodeRequestAuthenticationProvider implemen
 		if (this.logger.isTraceEnabled()) {
 			this.logger.trace("Authenticated authorization code request");
 		}
-
+		// 返回该类型的Authentication
 		return new OAuth2AuthorizationCodeRequestAuthenticationToken(authorizationRequest.getAuthorizationUri(),
 				registeredClient.getClientId(), principal, authorizationCode, redirectUri,
 				authorizationRequest.getState(), authorizationRequest.getScopes());

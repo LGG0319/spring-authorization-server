@@ -61,9 +61,11 @@ import org.springframework.util.StringUtils;
  * @see RegisteredClientRepository
  * @see OAuth2AuthorizationService
  * @see OAuth2AuthorizationConsentService
+ * 用户登录后点击授权，返回后由该AuthenticationProvider实现类处理
  */
 public final class OAuth2AuthorizationConsentAuthenticationProvider implements AuthenticationProvider {
 	private static final String ERROR_URI = "https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.2.1";
+	// state参数表示 正在进行的 OAuth2 授权
 	private static final OAuth2TokenType STATE_TOKEN_TYPE = new OAuth2TokenType(OAuth2ParameterNames.STATE);
 	private final Log logger = LogFactory.getLog(getClass());
 	private final RegisteredClientRepository registeredClientRepository;
@@ -89,6 +91,8 @@ public final class OAuth2AuthorizationConsentAuthenticationProvider implements A
 		this.authorizationConsentService = authorizationConsentService;
 	}
 
+	// 找到正在进行的 Authorization，在上面的OAuth2AuthorizationCodeRequestAuthenticationProvider requireAuthorizationConsent的if代码块中保存了，注意不是最后的哪里保存的
+	// 根据state参数寻找，防止CSRF
 	@Override
 	public Authentication authenticate(Authentication authentication) throws AuthenticationException {
 		if (authentication instanceof OAuth2DeviceAuthorizationConsentAuthenticationToken) {
@@ -112,12 +116,13 @@ public final class OAuth2AuthorizationConsentAuthenticationProvider implements A
 		}
 
 		// The 'in-flight' authorization must be associated to the current principal
+		// 关联 authroization和principal
 		Authentication principal = (Authentication) authorizationConsentAuthentication.getPrincipal();
 		if (!isPrincipalAuthenticated(principal) || !principal.getName().equals(authorization.getPrincipalName())) {
 			throwError(OAuth2ErrorCodes.INVALID_REQUEST, OAuth2ParameterNames.STATE,
 					authorizationConsentAuthentication, null, null);
 		}
-
+		// 验证RegisteredClient
 		RegisteredClient registeredClient = this.registeredClientRepository.findByClientId(
 				authorizationConsentAuthentication.getClientId());
 		if (registeredClient == null || !registeredClient.getId().equals(authorization.getRegisteredClientId())) {
@@ -128,7 +133,7 @@ public final class OAuth2AuthorizationConsentAuthenticationProvider implements A
 		if (this.logger.isTraceEnabled()) {
 			this.logger.trace("Retrieved registered client");
 		}
-
+		// 判断需要的授权和用户给的授权是否覆盖，不足则抛异常
 		OAuth2AuthorizationRequest authorizationRequest = authorization.getAttribute(OAuth2AuthorizationRequest.class.getName());
 		Set<String> requestedScopes = authorizationRequest.getScopes();
 		Set<String> authorizedScopes = new HashSet<>(authorizationConsentAuthentication.getScopes());
@@ -140,12 +145,12 @@ public final class OAuth2AuthorizationConsentAuthenticationProvider implements A
 		if (this.logger.isTraceEnabled()) {
 			this.logger.trace("Validated authorization consent request parameters");
 		}
-
+		// 判断是否有授权
 		OAuth2AuthorizationConsent currentAuthorizationConsent = this.authorizationConsentService.findById(
 				authorization.getRegisteredClientId(), authorization.getPrincipalName());
 		Set<String> currentAuthorizedScopes = currentAuthorizationConsent != null ?
 				currentAuthorizationConsent.getScopes() : Collections.emptySet();
-
+		// 接下来根据client_id 和 principal_name把用户给的授权添加到已授权目录中
 		if (!currentAuthorizedScopes.isEmpty()) {
 			for (String requestedScope : requestedScopes) {
 				if (currentAuthorizedScopes.contains(requestedScope)) {
@@ -213,7 +218,7 @@ public final class OAuth2AuthorizationConsentAuthenticationProvider implements A
 				this.logger.trace("Saved authorization consent");
 			}
 		}
-
+		// 生成code
 		OAuth2TokenContext tokenContext = createAuthorizationCodeTokenContext(
 				authorizationConsentAuthentication, registeredClient, authorization, authorizedScopes);
 		OAuth2AuthorizationCode authorizationCode = this.authorizationCodeGenerator.generate(tokenContext);
@@ -226,7 +231,7 @@ public final class OAuth2AuthorizationConsentAuthenticationProvider implements A
 		if (this.logger.isTraceEnabled()) {
 			this.logger.trace("Generated authorization code");
 		}
-
+		// 保存Authorization进度
 		OAuth2Authorization updatedAuthorization = OAuth2Authorization.from(authorization)
 				.authorizedScopes(authorizedScopes)
 				.token(authorizationCode)
@@ -248,7 +253,7 @@ public final class OAuth2AuthorizationConsentAuthenticationProvider implements A
 		if (this.logger.isTraceEnabled()) {
 			this.logger.trace("Authenticated authorization consent request");
 		}
-
+		// 返回该类型到由OAuth2AuthorizationEndpointFilter的successHandler处理
 		return new OAuth2AuthorizationCodeRequestAuthenticationToken(
 				authorizationRequest.getAuthorizationUri(), registeredClient.getClientId(), principal, authorizationCode,
 				redirectUri, authorizationRequest.getState(), authorizedScopes);
