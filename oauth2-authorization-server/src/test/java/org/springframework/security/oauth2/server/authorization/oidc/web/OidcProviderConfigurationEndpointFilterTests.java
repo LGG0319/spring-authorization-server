@@ -18,7 +18,6 @@ package org.springframework.security.oauth2.server.authorization.oidc.web;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -44,7 +43,9 @@ import static org.mockito.Mockito.verifyNoInteractions;
  * @author Joe Grandja
  */
 public class OidcProviderConfigurationEndpointFilterTests {
+
 	private static final String DEFAULT_OIDC_PROVIDER_CONFIGURATION_ENDPOINT_URI = "/.well-known/openid-configuration";
+
 	private final OidcProviderConfigurationEndpointFilter filter = new OidcProviderConfigurationEndpointFilter();
 
 	@AfterEach
@@ -55,14 +56,14 @@ public class OidcProviderConfigurationEndpointFilterTests {
 	@Test
 	public void setProviderConfigurationCustomizerWhenNullThenThrowIllegalArgumentException() {
 		assertThatThrownBy(() -> this.filter.setProviderConfigurationCustomizer(null))
-				.isInstanceOf(IllegalArgumentException.class)
-				.hasMessage("providerConfigurationCustomizer cannot be null");
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessage("providerConfigurationCustomizer cannot be null");
 	}
 
 	@Test
 	public void doFilterWhenNotConfigurationRequestThenNotProcessed() throws Exception {
-		AuthorizationServerContextHolder.setContext(
-				new TestAuthorizationServerContext(AuthorizationServerSettings.builder().build(), null));
+		AuthorizationServerContextHolder
+			.setContext(new TestAuthorizationServerContext(AuthorizationServerSettings.builder().build(), null));
 
 		String requestUri = "/path";
 		MockHttpServletRequest request = new MockHttpServletRequest("GET", requestUri);
@@ -77,8 +78,8 @@ public class OidcProviderConfigurationEndpointFilterTests {
 
 	@Test
 	public void doFilterWhenConfigurationRequestPostThenNotProcessed() throws Exception {
-		AuthorizationServerContextHolder.setContext(
-				new TestAuthorizationServerContext(AuthorizationServerSettings.builder().build(), null));
+		AuthorizationServerContextHolder
+			.setContext(new TestAuthorizationServerContext(AuthorizationServerSettings.builder().build(), null));
 
 		String requestUri = DEFAULT_OIDC_PROVIDER_CONFIGURATION_ENDPOINT_URI;
 		MockHttpServletRequest request = new MockHttpServletRequest("POST", requestUri);
@@ -103,16 +104,17 @@ public class OidcProviderConfigurationEndpointFilterTests {
 		String tokenIntrospectionEndpoint = "/oauth2/v1/introspect";
 
 		AuthorizationServerSettings authorizationServerSettings = AuthorizationServerSettings.builder()
-				.issuer(issuer)
-				.authorizationEndpoint(authorizationEndpoint)
-				.tokenEndpoint(tokenEndpoint)
-				.jwkSetEndpoint(jwkSetEndpoint)
-				.oidcUserInfoEndpoint(userInfoEndpoint)
-				.oidcLogoutEndpoint(logoutEndpoint)
-				.tokenRevocationEndpoint(tokenRevocationEndpoint)
-				.tokenIntrospectionEndpoint(tokenIntrospectionEndpoint)
-				.build();
-		AuthorizationServerContextHolder.setContext(new TestAuthorizationServerContext(authorizationServerSettings, null));
+			.issuer(issuer)
+			.authorizationEndpoint(authorizationEndpoint)
+			.tokenEndpoint(tokenEndpoint)
+			.jwkSetEndpoint(jwkSetEndpoint)
+			.oidcUserInfoEndpoint(userInfoEndpoint)
+			.oidcLogoutEndpoint(logoutEndpoint)
+			.tokenRevocationEndpoint(tokenRevocationEndpoint)
+			.tokenIntrospectionEndpoint(tokenIntrospectionEndpoint)
+			.build();
+		AuthorizationServerContextHolder
+			.setContext(new TestAuthorizationServerContext(authorizationServerSettings, null));
 
 		String requestUri = DEFAULT_OIDC_PROVIDER_CONFIGURATION_ENDPOINT_URI;
 		MockHttpServletRequest request = new MockHttpServletRequest("GET", requestUri);
@@ -127,31 +129,41 @@ public class OidcProviderConfigurationEndpointFilterTests {
 		assertThat(response.getContentType()).isEqualTo(MediaType.APPLICATION_JSON_VALUE);
 		String providerConfigurationResponse = response.getContentAsString();
 		assertThat(providerConfigurationResponse).contains("\"issuer\":\"https://example.com\"");
-		assertThat(providerConfigurationResponse).contains("\"authorization_endpoint\":\"https://example.com/oauth2/v1/authorize\"");
-		assertThat(providerConfigurationResponse).contains("\"token_endpoint\":\"https://example.com/oauth2/v1/token\"");
+		assertThat(providerConfigurationResponse)
+			.contains("\"authorization_endpoint\":\"https://example.com/oauth2/v1/authorize\"");
+		assertThat(providerConfigurationResponse)
+			.contains("\"token_endpoint\":\"https://example.com/oauth2/v1/token\"");
 		assertThat(providerConfigurationResponse).contains("\"jwks_uri\":\"https://example.com/oauth2/v1/jwks\"");
 		assertThat(providerConfigurationResponse).contains("\"scopes_supported\":[\"openid\"]");
 		assertThat(providerConfigurationResponse).contains("\"response_types_supported\":[\"code\"]");
-		assertThat(providerConfigurationResponse).contains("\"grant_types_supported\":[\"authorization_code\",\"client_credentials\",\"refresh_token\",\"urn:ietf:params:oauth:grant-type:device_code\",\"urn:ietf:params:oauth:grant-type:token-exchange\"]");
-		assertThat(providerConfigurationResponse).contains("\"revocation_endpoint\":\"https://example.com/oauth2/v1/revoke\"");
-		assertThat(providerConfigurationResponse).contains("\"revocation_endpoint_auth_methods_supported\":[\"client_secret_basic\",\"client_secret_post\",\"client_secret_jwt\",\"private_key_jwt\",\"tls_client_auth\",\"self_signed_tls_client_auth\"]");
-		assertThat(providerConfigurationResponse).contains("\"introspection_endpoint\":\"https://example.com/oauth2/v1/introspect\"");
-		assertThat(providerConfigurationResponse).contains("\"introspection_endpoint_auth_methods_supported\":[\"client_secret_basic\",\"client_secret_post\",\"client_secret_jwt\",\"private_key_jwt\",\"tls_client_auth\",\"self_signed_tls_client_auth\"]");
+		assertThat(providerConfigurationResponse).contains(
+				"\"grant_types_supported\":[\"authorization_code\",\"client_credentials\",\"refresh_token\",\"urn:ietf:params:oauth:grant-type:device_code\",\"urn:ietf:params:oauth:grant-type:token-exchange\"]");
+		assertThat(providerConfigurationResponse)
+			.contains("\"revocation_endpoint\":\"https://example.com/oauth2/v1/revoke\"");
+		assertThat(providerConfigurationResponse).contains(
+				"\"revocation_endpoint_auth_methods_supported\":[\"client_secret_basic\",\"client_secret_post\",\"client_secret_jwt\",\"private_key_jwt\",\"tls_client_auth\",\"self_signed_tls_client_auth\"]");
+		assertThat(providerConfigurationResponse)
+			.contains("\"introspection_endpoint\":\"https://example.com/oauth2/v1/introspect\"");
+		assertThat(providerConfigurationResponse).contains(
+				"\"introspection_endpoint_auth_methods_supported\":[\"client_secret_basic\",\"client_secret_post\",\"client_secret_jwt\",\"private_key_jwt\",\"tls_client_auth\",\"self_signed_tls_client_auth\"]");
 		assertThat(providerConfigurationResponse).contains("\"code_challenge_methods_supported\":[\"S256\"]");
 		assertThat(providerConfigurationResponse).contains("\"tls_client_certificate_bound_access_tokens\":true");
 		assertThat(providerConfigurationResponse).contains("\"subject_types_supported\":[\"public\"]");
 		assertThat(providerConfigurationResponse).contains("\"id_token_signing_alg_values_supported\":[\"RS256\"]");
 		assertThat(providerConfigurationResponse).contains("\"userinfo_endpoint\":\"https://example.com/userinfo\"");
-		assertThat(providerConfigurationResponse).contains("\"end_session_endpoint\":\"https://example.com/connect/logout\"");
-		assertThat(providerConfigurationResponse).contains("\"token_endpoint_auth_methods_supported\":[\"client_secret_basic\",\"client_secret_post\",\"client_secret_jwt\",\"private_key_jwt\",\"tls_client_auth\",\"self_signed_tls_client_auth\"]");
+		assertThat(providerConfigurationResponse)
+			.contains("\"end_session_endpoint\":\"https://example.com/connect/logout\"");
+		assertThat(providerConfigurationResponse).contains(
+				"\"token_endpoint_auth_methods_supported\":[\"client_secret_basic\",\"client_secret_post\",\"client_secret_jwt\",\"private_key_jwt\",\"tls_client_auth\",\"self_signed_tls_client_auth\"]");
 	}
 
 	@Test
 	public void doFilterWhenAuthorizationServerSettingsWithInvalidIssuerThenThrowIllegalArgumentException() {
 		AuthorizationServerSettings authorizationServerSettings = AuthorizationServerSettings.builder()
-				.issuer("https://this is an invalid URL")
-				.build();
-		AuthorizationServerContextHolder.setContext(new TestAuthorizationServerContext(authorizationServerSettings, null));
+			.issuer("https://this is an invalid URL")
+			.build();
+		AuthorizationServerContextHolder
+			.setContext(new TestAuthorizationServerContext(authorizationServerSettings, null));
 
 		String requestUri = DEFAULT_OIDC_PROVIDER_CONFIGURATION_ENDPOINT_URI;
 		MockHttpServletRequest request = new MockHttpServletRequest("GET", requestUri);
@@ -159,9 +171,8 @@ public class OidcProviderConfigurationEndpointFilterTests {
 		MockHttpServletResponse response = new MockHttpServletResponse();
 		FilterChain filterChain = mock(FilterChain.class);
 
-		assertThatIllegalArgumentException()
-				.isThrownBy(() -> this.filter.doFilter(request, response, filterChain))
-				.withMessage("issuer must be a valid URL");
+		assertThatIllegalArgumentException().isThrownBy(() -> this.filter.doFilter(request, response, filterChain))
+			.withMessage("issuer must be a valid URL");
 	}
 
 }

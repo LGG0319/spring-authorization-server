@@ -68,11 +68,11 @@ public class OAuth2AuthorizationServerConfiguration {
 		// 仅对授权服务器端点请求进行安全配置
 		http
 			.securityMatcher(endpointsMatcher)
-			.authorizeHttpRequests(authorize ->
+			.authorizeHttpRequests((authorize) ->
 				authorize.anyRequest().authenticated()
 			)
-				// 对授权服务器端点关闭csrf保护
-			.csrf(csrf -> csrf.ignoringRequestMatchers(endpointsMatcher))
+			// 对授权服务器端点关闭csrf保护
+			.csrf((csrf) -> csrf.ignoringRequestMatchers(endpointsMatcher))
 			.apply(authorizationServerConfigurer);
 	}
 	// @formatter:on
@@ -86,10 +86,10 @@ public class OAuth2AuthorizationServerConfiguration {
 		jwsAlgs.addAll(JWSAlgorithm.Family.HMAC_SHA);
 		// JWT处理器，负责处理签名/加密/明文的jwt
 		ConfigurableJWTProcessor<SecurityContext> jwtProcessor = new DefaultJWTProcessor<>();
-		JWSKeySelector<SecurityContext> jwsKeySelector =
-				new JWSVerificationKeySelector<>(jwsAlgs, jwkSource);
+		JWSKeySelector<SecurityContext> jwsKeySelector = new JWSVerificationKeySelector<>(jwsAlgs, jwkSource);
 		jwtProcessor.setJWSKeySelector(jwsKeySelector);
-		// Override the default Nimbus claims set verifier as NimbusJwtDecoder handles it instead
+		// Override the default Nimbus claims set verifier as NimbusJwtDecoder handles it
+		// instead
 		// 覆盖Nimbus默认的JWT声明校验器，不对声明进行校验
 		jwtProcessor.setJWTClaimsSetVerifier((claims, context) -> {
 		});
@@ -99,7 +99,8 @@ public class OAuth2AuthorizationServerConfiguration {
 	@Bean
 	RegisterMissingBeanPostProcessor registerMissingBeanPostProcessor() {
 		RegisterMissingBeanPostProcessor postProcessor = new RegisterMissingBeanPostProcessor();
-		postProcessor.addBeanDefinition(AuthorizationServerSettings.class, () -> AuthorizationServerSettings.builder().build());
+		postProcessor.addBeanDefinition(AuthorizationServerSettings.class,
+				() -> AuthorizationServerSettings.builder().build());
 		return postProcessor;
 	}
 

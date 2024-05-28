@@ -36,7 +36,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.util.UriComponentsBuilder;
 
 /**
- * A {@code Filter} that associates the {@link AuthorizationServerContext} to the {@link AuthorizationServerContextHolder}.
+ * A {@code Filter} that associates the {@link AuthorizationServerContext} to the
+ * {@link AuthorizationServerContextHolder}.
  *
  * @author Joe Grandja
  * @since 0.2.2
@@ -45,7 +46,9 @@ import org.springframework.web.util.UriComponentsBuilder;
  * @see AuthorizationServerSettings
  */
 final class AuthorizationServerContextFilter extends OncePerRequestFilter {
+
 	private final AuthorizationServerSettings authorizationServerSettings;
+
 	private final IssuerResolver issuerResolver;
 
 	AuthorizationServerContextFilter(AuthorizationServerSettings authorizationServerSettings) {
@@ -60,24 +63,28 @@ final class AuthorizationServerContextFilter extends OncePerRequestFilter {
 
 		try {
 			String issuer = this.issuerResolver.resolve(request);
-			AuthorizationServerContext authorizationServerContext =
-					new DefaultAuthorizationServerContext(issuer, this.authorizationServerSettings);
+			AuthorizationServerContext authorizationServerContext = new DefaultAuthorizationServerContext(issuer,
+					this.authorizationServerSettings);
 			AuthorizationServerContextHolder.setContext(authorizationServerContext);
 			filterChain.doFilter(request, response);
-		} finally {
+		}
+		finally {
 			AuthorizationServerContextHolder.resetContext();
 		}
 	}
 
 	private static final class IssuerResolver {
+
 		private final String issuer;
+
 		private final Set<String> endpointUris;
 
 		private IssuerResolver(AuthorizationServerSettings authorizationServerSettings) {
 			if (authorizationServerSettings.getIssuer() != null) {
 				this.issuer = authorizationServerSettings.getIssuer();
 				this.endpointUris = Collections.emptySet();
-			} else {
+			}
+			else {
 				this.issuer = null;
 				this.endpointUris = new HashSet<>();
 				this.endpointUris.add("/.well-known/oauth-authorization-server");
@@ -99,7 +106,8 @@ final class AuthorizationServerContextFilter extends OncePerRequestFilter {
 			String path = request.getRequestURI();
 			if (!StringUtils.hasText(path)) {
 				path = "";
-			} else {
+			}
+			else {
 				for (String endpointUri : this.endpointUris) {
 					if (path.contains(endpointUri)) {
 						path = path.replace(endpointUri, "");
@@ -121,10 +129,13 @@ final class AuthorizationServerContextFilter extends OncePerRequestFilter {
 	}
 
 	private static final class DefaultAuthorizationServerContext implements AuthorizationServerContext {
+
 		private final String issuer;
+
 		private final AuthorizationServerSettings authorizationServerSettings;
 
-		private DefaultAuthorizationServerContext(String issuer, AuthorizationServerSettings authorizationServerSettings) {
+		private DefaultAuthorizationServerContext(String issuer,
+				AuthorizationServerSettings authorizationServerSettings) {
 			this.issuer = issuer;
 			this.authorizationServerSettings = authorizationServerSettings;
 		}

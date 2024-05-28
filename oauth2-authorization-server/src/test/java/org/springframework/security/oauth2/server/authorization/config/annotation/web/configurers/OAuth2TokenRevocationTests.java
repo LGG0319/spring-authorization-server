@@ -85,9 +85,9 @@ import org.springframework.util.MultiValueMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -98,14 +98,23 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @ExtendWith(SpringTestContextExtension.class)
 public class OAuth2TokenRevocationTests {
+
 	private static final String DEFAULT_TOKEN_REVOCATION_ENDPOINT_URI = "/oauth2/revoke";
+
 	private static EmbeddedDatabase db;
+
 	private static JWKSource<SecurityContext> jwkSource;
+
 	private static AuthenticationConverter authenticationConverter;
+
 	private static Consumer<List<AuthenticationConverter>> authenticationConvertersConsumer;
+
 	private static AuthenticationProvider authenticationProvider;
+
 	private static Consumer<List<AuthenticationProvider>> authenticationProvidersConsumer;
+
 	private static AuthenticationSuccessHandler authenticationSuccessHandler;
+
 	private static AuthenticationFailureHandler authenticationFailureHandler;
 
 	public final SpringTestContext spring = new SpringTestContext();
@@ -132,19 +141,19 @@ public class OAuth2TokenRevocationTests {
 		authenticationProvidersConsumer = mock(Consumer.class);
 		authenticationSuccessHandler = mock(AuthenticationSuccessHandler.class);
 		authenticationFailureHandler = mock(AuthenticationFailureHandler.class);
-		db = new EmbeddedDatabaseBuilder()
-				.generateUniqueName(true)
-				.setType(EmbeddedDatabaseType.HSQL)
-				.setScriptEncoding("UTF-8")
-				.addScript("org/springframework/security/oauth2/server/authorization/oauth2-authorization-schema.sql")
-				.addScript("org/springframework/security/oauth2/server/authorization/client/oauth2-registered-client-schema.sql")
-				.build();
+		db = new EmbeddedDatabaseBuilder().generateUniqueName(true)
+			.setType(EmbeddedDatabaseType.HSQL)
+			.setScriptEncoding("UTF-8")
+			.addScript("org/springframework/security/oauth2/server/authorization/oauth2-authorization-schema.sql")
+			.addScript(
+					"org/springframework/security/oauth2/server/authorization/client/oauth2-registered-client-schema.sql")
+			.build();
 	}
 
 	@AfterEach
 	public void tearDown() {
-		jdbcOperations.update("truncate table oauth2_authorization");
-		jdbcOperations.update("truncate table oauth2_registered_client");
+		this.jdbcOperations.update("truncate table oauth2_authorization");
+		this.jdbcOperations.update("truncate table oauth2_registered_client");
 	}
 
 	@AfterAll
@@ -164,11 +173,12 @@ public class OAuth2TokenRevocationTests {
 		OAuth2TokenType tokenType = OAuth2TokenType.REFRESH_TOKEN;
 		this.authorizationService.save(authorization);
 
-		this.mvc.perform(post(DEFAULT_TOKEN_REVOCATION_ENDPOINT_URI)
+		this.mvc
+			.perform(post(DEFAULT_TOKEN_REVOCATION_ENDPOINT_URI)
 				.params(getTokenRevocationRequestParameters(token, tokenType))
-				.header(HttpHeaders.AUTHORIZATION, "Basic " + encodeBasicAuth(
-						registeredClient.getClientId(), registeredClient.getClientSecret())))
-				.andExpect(status().isOk());
+				.header(HttpHeaders.AUTHORIZATION,
+						"Basic " + encodeBasicAuth(registeredClient.getClientId(), registeredClient.getClientSecret())))
+			.andExpect(status().isOk());
 
 		OAuth2Authorization updatedAuthorization = this.authorizationService.findById(authorization.getId());
 		OAuth2Authorization.Token<OAuth2RefreshToken> refreshToken = updatedAuthorization.getRefreshToken();
@@ -189,11 +199,12 @@ public class OAuth2TokenRevocationTests {
 		OAuth2TokenType tokenType = OAuth2TokenType.ACCESS_TOKEN;
 		this.authorizationService.save(authorization);
 
-		this.mvc.perform(post(DEFAULT_TOKEN_REVOCATION_ENDPOINT_URI)
+		this.mvc
+			.perform(post(DEFAULT_TOKEN_REVOCATION_ENDPOINT_URI)
 				.params(getTokenRevocationRequestParameters(token, tokenType))
-				.header(HttpHeaders.AUTHORIZATION, "Basic " + encodeBasicAuth(
-						registeredClient.getClientId(), registeredClient.getClientSecret())))
-				.andExpect(status().isOk());
+				.header(HttpHeaders.AUTHORIZATION,
+						"Basic " + encodeBasicAuth(registeredClient.getClientId(), registeredClient.getClientSecret())))
+			.andExpect(status().isOk());
 
 		OAuth2Authorization updatedAuthorization = this.authorizationService.findById(authorization.getId());
 		OAuth2Authorization.Token<OAuth2AccessToken> accessToken = updatedAuthorization.getAccessToken();
@@ -243,45 +254,47 @@ public class OAuth2TokenRevocationTests {
 		OAuth2TokenType tokenType = OAuth2TokenType.ACCESS_TOKEN;
 		this.authorizationService.save(authorization);
 
-		Authentication clientPrincipal = new OAuth2ClientAuthenticationToken(
-				registeredClient, ClientAuthenticationMethod.CLIENT_SECRET_BASIC, registeredClient.getClientSecret());
-		OAuth2TokenRevocationAuthenticationToken tokenRevocationAuthentication =
-				new OAuth2TokenRevocationAuthenticationToken(token, clientPrincipal);
+		Authentication clientPrincipal = new OAuth2ClientAuthenticationToken(registeredClient,
+				ClientAuthenticationMethod.CLIENT_SECRET_BASIC, registeredClient.getClientSecret());
+		OAuth2TokenRevocationAuthenticationToken tokenRevocationAuthentication = new OAuth2TokenRevocationAuthenticationToken(
+				token, clientPrincipal);
 
-		when(authenticationConverter.convert(any())).thenReturn(tokenRevocationAuthentication);
-		when(authenticationProvider.supports(eq(OAuth2TokenRevocationAuthenticationToken.class))).thenReturn(true);
-		when(authenticationProvider.authenticate(any())).thenReturn(tokenRevocationAuthentication);
+		given(authenticationConverter.convert(any())).willReturn(tokenRevocationAuthentication);
+		given(authenticationProvider.supports(eq(OAuth2TokenRevocationAuthenticationToken.class))).willReturn(true);
+		given(authenticationProvider.authenticate(any())).willReturn(tokenRevocationAuthentication);
 
-		this.mvc.perform(post(DEFAULT_TOKEN_REVOCATION_ENDPOINT_URI)
+		this.mvc
+			.perform(post(DEFAULT_TOKEN_REVOCATION_ENDPOINT_URI)
 				.params(getTokenRevocationRequestParameters(token, tokenType))
-				.header(HttpHeaders.AUTHORIZATION, "Basic " + encodeBasicAuth(
-						registeredClient.getClientId(), registeredClient.getClientSecret())))
-				.andExpect(status().isOk());
+				.header(HttpHeaders.AUTHORIZATION,
+						"Basic " + encodeBasicAuth(registeredClient.getClientId(), registeredClient.getClientSecret())))
+			.andExpect(status().isOk());
 
 		verify(authenticationConverter).convert(any());
 
 		@SuppressWarnings("unchecked")
-		ArgumentCaptor<List<AuthenticationConverter>> authenticationConvertersCaptor = ArgumentCaptor.forClass(List.class);
+		ArgumentCaptor<List<AuthenticationConverter>> authenticationConvertersCaptor = ArgumentCaptor
+			.forClass(List.class);
 		verify(authenticationConvertersConsumer).accept(authenticationConvertersCaptor.capture());
 		List<AuthenticationConverter> authenticationConverters = authenticationConvertersCaptor.getValue();
-		assertThat(authenticationConverters).allMatch((converter) ->
-				converter == authenticationConverter ||
-						converter instanceof OAuth2TokenRevocationAuthenticationConverter);
+		assertThat(authenticationConverters).allMatch((converter) -> converter == authenticationConverter
+				|| converter instanceof OAuth2TokenRevocationAuthenticationConverter);
 
 		verify(authenticationProvider).authenticate(eq(tokenRevocationAuthentication));
 
 		@SuppressWarnings("unchecked")
-		ArgumentCaptor<List<AuthenticationProvider>> authenticationProvidersCaptor = ArgumentCaptor.forClass(List.class);
+		ArgumentCaptor<List<AuthenticationProvider>> authenticationProvidersCaptor = ArgumentCaptor
+			.forClass(List.class);
 		verify(authenticationProvidersConsumer).accept(authenticationProvidersCaptor.capture());
 		List<AuthenticationProvider> authenticationProviders = authenticationProvidersCaptor.getValue();
-		assertThat(authenticationProviders).allMatch((provider) ->
-				provider == authenticationProvider ||
-						provider instanceof OAuth2TokenRevocationAuthenticationProvider);
+		assertThat(authenticationProviders).allMatch((provider) -> provider == authenticationProvider
+				|| provider instanceof OAuth2TokenRevocationAuthenticationProvider);
 
 		verify(authenticationSuccessHandler).onAuthenticationSuccess(any(), any(), eq(tokenRevocationAuthentication));
 	}
 
-	private static MultiValueMap<String, String> getTokenRevocationRequestParameters(OAuth2Token token, OAuth2TokenType tokenType) {
+	private static MultiValueMap<String, String> getTokenRevocationRequestParameters(OAuth2Token token,
+			OAuth2TokenType tokenType) {
 		MultiValueMap<String, String> parameters = new LinkedMultiValueMap<>();
 		parameters.set(OAuth2ParameterNames.TOKEN, token.getTokenValue());
 		parameters.set(OAuth2ParameterNames.TOKEN_TYPE_HINT, tokenType.getValue());
@@ -301,8 +314,10 @@ public class OAuth2TokenRevocationTests {
 	static class AuthorizationServerConfiguration {
 
 		@Bean
-		OAuth2AuthorizationService authorizationService(JdbcOperations jdbcOperations, RegisteredClientRepository registeredClientRepository) {
-			JdbcOAuth2AuthorizationService authorizationService = new JdbcOAuth2AuthorizationService(jdbcOperations, registeredClientRepository);
+		OAuth2AuthorizationService authorizationService(JdbcOperations jdbcOperations,
+				RegisteredClientRepository registeredClientRepository) {
+			JdbcOAuth2AuthorizationService authorizationService = new JdbcOAuth2AuthorizationService(jdbcOperations,
+					registeredClientRepository);
 			authorizationService.setAuthorizationRowMapper(new RowMapper(registeredClientRepository));
 			authorizationService.setAuthorizationParametersMapper(new ParametersMapper());
 			return authorizationService;
@@ -310,7 +325,8 @@ public class OAuth2TokenRevocationTests {
 
 		@Bean
 		RegisteredClientRepository registeredClientRepository(JdbcOperations jdbcOperations) {
-			JdbcRegisteredClientRepository jdbcRegisteredClientRepository = new JdbcRegisteredClientRepository(jdbcOperations);
+			JdbcRegisteredClientRepository jdbcRegisteredClientRepository = new JdbcRegisteredClientRepository(
+					jdbcOperations);
 			RegisteredClientParametersMapper registeredClientParametersMapper = new RegisteredClientParametersMapper();
 			jdbcRegisteredClientRepository.setRegisteredClientParametersMapper(registeredClientParametersMapper);
 			return jdbcRegisteredClientRepository;
@@ -353,15 +369,16 @@ public class OAuth2TokenRevocationTests {
 
 	@EnableWebSecurity
 	@Configuration(proxyBeanMethods = false)
-	static class AuthorizationServerConfigurationCustomTokenRevocationEndpoint extends AuthorizationServerConfiguration {
+	static class AuthorizationServerConfigurationCustomTokenRevocationEndpoint
+			extends AuthorizationServerConfiguration {
 
 		// @formatter:off
 		@Bean
-		public SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http) throws Exception {
+		SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http) throws Exception {
 			OAuth2AuthorizationServerConfigurer authorizationServerConfigurer =
 					new OAuth2AuthorizationServerConfigurer();
 			authorizationServerConfigurer
-					.tokenRevocationEndpoint(tokenRevocationEndpoint ->
+					.tokenRevocationEndpoint((tokenRevocationEndpoint) ->
 							tokenRevocationEndpoint
 									.revocationRequestConverter(authenticationConverter)
 									.revocationRequestConverters(authenticationConvertersConsumer)
@@ -373,10 +390,10 @@ public class OAuth2TokenRevocationTests {
 
 			http
 					.securityMatcher(endpointsMatcher)
-					.authorizeHttpRequests(authorize ->
+					.authorizeHttpRequests((authorize) ->
 							authorize.anyRequest().authenticated()
 					)
-					.csrf(csrf -> csrf.ignoringRequestMatchers(endpointsMatcher))
+					.csrf((csrf) -> csrf.ignoringRequestMatchers(endpointsMatcher))
 					.apply(authorizationServerConfigurer);
 			return http.build();
 		}
