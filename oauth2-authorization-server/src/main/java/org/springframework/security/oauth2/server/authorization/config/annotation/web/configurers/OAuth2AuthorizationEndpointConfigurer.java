@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2024 the original author or authors.
+ * Copyright 2020-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -244,7 +244,6 @@ public final class OAuth2AuthorizationEndpointConfigurer extends AbstractOAuth2C
 		this.requestMatcher = new OrRequestMatcher(
 				new AntPathRequestMatcher(authorizationEndpointUri, HttpMethod.GET.name()),
 				new AntPathRequestMatcher(authorizationEndpointUri, HttpMethod.POST.name()));
-
 		List<AuthenticationProvider> authenticationProviders = createDefaultAuthenticationProviders(httpSecurity);
 		if (!this.authenticationProviders.isEmpty()) {
 			authenticationProviders.addAll(0, this.authenticationProviders);

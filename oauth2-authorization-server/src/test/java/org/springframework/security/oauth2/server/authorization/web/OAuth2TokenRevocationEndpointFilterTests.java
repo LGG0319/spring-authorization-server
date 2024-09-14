@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 the original author or authors.
+ * Copyright 2020-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.mock.http.client.MockClientHttpResponse;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.authentication.AuthenticationDetailsSource;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
@@ -52,6 +53,7 @@ import org.springframework.security.oauth2.server.authorization.client.TestRegis
 import org.springframework.security.web.authentication.AuthenticationConverter;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
+import org.springframework.security.web.authentication.WebAuthenticationDetails;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -100,6 +102,13 @@ public class OAuth2TokenRevocationEndpointFilterTests {
 		assertThatThrownBy(() -> new OAuth2TokenRevocationEndpointFilter(this.authenticationManager, null))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessage("tokenRevocationEndpointUri cannot be empty");
+	}
+
+	@Test
+	public void setAuthenticationDetailsSourceWhenNullThenThrowIllegalArgumentException() {
+		assertThatThrownBy(() -> this.filter.setAuthenticationDetailsSource(null))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessage("authenticationDetailsSource cannot be null");
 	}
 
 	@Test
@@ -196,6 +205,40 @@ public class OAuth2TokenRevocationEndpointFilterTests {
 		verify(this.authenticationManager).authenticate(any());
 
 		assertThat(response.getStatus()).isEqualTo(HttpStatus.OK.value());
+	}
+
+	@Test
+	public void doFilterWhenCustomAuthenticationDetailsSourceThenUsed() throws Exception {
+		RegisteredClient registeredClient = TestRegisteredClients.registeredClient().build();
+		Authentication clientPrincipal = new OAuth2ClientAuthenticationToken(registeredClient,
+				ClientAuthenticationMethod.CLIENT_SECRET_BASIC, registeredClient.getClientSecret());
+
+		MockHttpServletRequest request = createTokenRevocationRequest();
+
+		AuthenticationDetailsSource<HttpServletRequest, WebAuthenticationDetails> authenticationDetailsSource = mock(
+				AuthenticationDetailsSource.class);
+		WebAuthenticationDetails webAuthenticationDetails = new WebAuthenticationDetails(request);
+		given(authenticationDetailsSource.buildDetails(any())).willReturn(webAuthenticationDetails);
+		this.filter.setAuthenticationDetailsSource(authenticationDetailsSource);
+
+		OAuth2AccessToken accessToken = new OAuth2AccessToken(OAuth2AccessToken.TokenType.BEARER, "token",
+				Instant.now(), Instant.now().plus(Duration.ofHours(1)),
+				new HashSet<>(Arrays.asList("scope1", "scope2")));
+		OAuth2TokenRevocationAuthenticationToken tokenRevocationAuthentication = new OAuth2TokenRevocationAuthenticationToken(
+				accessToken, clientPrincipal);
+
+		given(this.authenticationManager.authenticate(any())).willReturn(tokenRevocationAuthentication);
+
+		SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
+		securityContext.setAuthentication(clientPrincipal);
+		SecurityContextHolder.setContext(securityContext);
+
+		MockHttpServletResponse response = new MockHttpServletResponse();
+		FilterChain filterChain = mock(FilterChain.class);
+
+		this.filter.doFilter(request, response, filterChain);
+
+		verify(authenticationDetailsSource).buildDetails(any());
 	}
 
 	@Test

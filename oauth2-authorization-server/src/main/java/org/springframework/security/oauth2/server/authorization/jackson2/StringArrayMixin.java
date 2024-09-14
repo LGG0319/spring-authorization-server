@@ -13,29 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.springframework.security.oauth2.server.authorization.util;
+package org.springframework.security.oauth2.server.authorization.jackson2;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 /**
- * Internal class used for serialization across Spring Authorization Server classes.
+ * This mixin class is used to serialize/deserialize {@link String} array.
  *
- * @author Anoop Garlapati
- * @since 0.0.1
+ * @author Nikola Jovanovic
+ * @since 1.2.6
+ * @see String
  */
-public final class SpringAuthorizationServerVersion {
+@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS)
+abstract class StringArrayMixin {
 
-	private static final int MAJOR = 1;
-
-	private static final int MINOR = 4;
-
-	private static final int PATCH = 0;
-
-	/**
-	 * Global Serialization value for Spring Authorization Server classes.
-	 */
-	public static final long SERIAL_VERSION_UID = getVersion().hashCode();
-
-	public static String getVersion() {
-		return MAJOR + "." + MINOR + "." + PATCH;
+	@JsonCreator
+	StringArrayMixin(String[] array) {
 	}
 
 }
