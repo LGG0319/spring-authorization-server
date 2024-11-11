@@ -90,6 +90,17 @@ public final class OAuth2AuthorizationServerConfigurer
 	private RequestMatcher endpointsMatcher;
 
 	/**
+	 * Returns a new instance of {@link OAuth2AuthorizationServerConfigurer} for
+	 * configuring.
+	 * @return a new instance of {@link OAuth2AuthorizationServerConfigurer} for
+	 * configuring
+	 * @since 1.4
+	 */
+	public static OAuth2AuthorizationServerConfigurer authorizationServer() {
+		return new OAuth2AuthorizationServerConfigurer();
+	}
+
+	/**
 	 * Sets the repository of registered clients.
 	 * @param registeredClientRepository the repository of registered clients
 	 * @return the {@link OAuth2AuthorizationServerConfigurer} for further configuration
@@ -281,7 +292,7 @@ public final class OAuth2AuthorizationServerConfigurer
 
 	// 配置器初始化
 	@Override
-	public void init(HttpSecurity httpSecurity) {
+	public void init(HttpSecurity httpSecurity) throws Exception {
 		// 获取授权服务器设置(各端点url)
 		AuthorizationServerSettings authorizationServerSettings = OAuth2ConfigurerUtils
 			.getAuthorizationServerSettings(httpSecurity);
@@ -352,6 +363,20 @@ public final class OAuth2AuthorizationServerConfigurer
 							getRequestMatcher(OAuth2TokenIntrospectionEndpointConfigurer.class),
 							getRequestMatcher(OAuth2TokenRevocationEndpointConfigurer.class),
 							getRequestMatcher(OAuth2DeviceAuthorizationEndpointConfigurer.class)));
+		}
+
+		httpSecurity.csrf((csrf) -> csrf.ignoringRequestMatchers(this.endpointsMatcher));
+
+		OidcConfigurer oidcConfigurer = getConfigurer(OidcConfigurer.class);
+		if (oidcConfigurer != null) {
+			if (oidcConfigurer.getConfigurer(OidcUserInfoEndpointConfigurer.class) != null
+					|| oidcConfigurer.getConfigurer(OidcClientRegistrationEndpointConfigurer.class) != null) {
+				httpSecurity
+					// Accept access tokens for User Info and/or Client Registration
+					.oauth2ResourceServer(
+							(oauth2ResourceServer) -> oauth2ResourceServer.jwt(Customizer.withDefaults()));
+
+			}
 		}
 	}
 
